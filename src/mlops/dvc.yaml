@@ -1,0 +1,38 @@
+# DVC pipeline — run `dvc repro` from the repo root.
+# dataset-vN -> model-vN, so any experiment is reproducible from a commit hash.
+stages:
+  generate_data:
+    cmd: python data/generate_synthetic_data.py
+    outs:
+      - data/users.csv
+      - data/products.csv
+      - data/events.csv
+
+  build_features:
+    cmd: python -c "from src.features.feature_engineering import *; print('features built inline by callers')"
+    deps:
+      - data/events.csv
+      - data/products.csv
+      - src/features/feature_engineering.py
+
+  train_ranker:
+    cmd: python src/ranking/train_ranker.py
+    deps:
+      - data/events.csv
+      - data/products.csv
+      - data/users.csv
+      - src/ranking/train_ranker.py
+    outs:
+      - models/ranker.txt
+    metrics:
+      - metrics/ranker_metrics.json:
+          cache: false
+
+  offline_eval:
+    cmd: python run_pipeline.py --eval-only
+    deps:
+      - models/ranker.txt
+      - src/evaluation/offline_eval.py
+    metrics:
+      - metrics/offline_eval.json:
+          cache: false

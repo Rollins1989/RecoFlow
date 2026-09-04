@@ -1,0 +1,28 @@
+{
+  "title": "RecoFlow — Serving & Recommendation Health",
+  "timezone": "browser",
+  "panels": [
+    {"title": "Requests/sec by endpoint", "type": "graph",
+     "targets": [{"expr": "sum(rate(recoflow_requests_total[1m])) by (endpoint)"}]},
+    {"title": "P50 / P95 / P99 latency", "type": "graph",
+     "targets": [
+       {"expr": "histogram_quantile(0.50, sum(rate(recoflow_request_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p50"},
+       {"expr": "histogram_quantile(0.95, sum(rate(recoflow_request_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p95"},
+       {"expr": "histogram_quantile(0.99, sum(rate(recoflow_request_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p99"}
+     ]},
+    {"title": "Error rate", "type": "graph",
+     "targets": [{"expr": "sum(rate(recoflow_requests_total{status=~\"5..\"}[5m])) / sum(rate(recoflow_requests_total[5m]))"}]},
+    {"title": "Cache hit rate", "type": "stat",
+     "targets": [{"expr": "sum(rate(recoflow_cache_hits_total[5m])) / sum(rate(recoflow_requests_total{endpoint=\"recommendations\"}[5m]))"}]},
+    {"title": "Candidate source mix", "type": "piechart",
+     "targets": [{"expr": "sum(recoflow_candidates_by_source) by (source)"}]},
+    {"title": "CTR drift (rolling vs training baseline)", "type": "graph",
+     "targets": [{"expr": "recoflow_ctr_drift_score"}]},
+    {"title": "Catalog coverage (rolling 1h)", "type": "stat",
+     "targets": [{"expr": "recoflow_catalog_coverage_ratio"}]},
+    {"title": "Recommendation diversity (rolling 1h)", "type": "stat",
+     "targets": [{"expr": "recoflow_recommendation_diversity"}]}
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}
