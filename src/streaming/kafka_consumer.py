@@ -12,7 +12,6 @@ Streaming consuming the same topic — the update logic in
 from __future__ import annotations
 
 import json
-import os
 import time
 
 from src.streaming.kafka_producer import KAFKA_BOOTSTRAP, TOPIC_USER_EVENTS, drain_local_queue

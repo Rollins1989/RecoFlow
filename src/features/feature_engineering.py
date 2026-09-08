@@ -6,7 +6,6 @@ path can run offline (training) and be mirrored by Feast online features
 """
 from __future__ import annotations
 
-import json
 from datetime import datetime
 
 import numpy as np

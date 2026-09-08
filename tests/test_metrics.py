@@ -1,4 +1,3 @@
-import numpy as np
 
 from src.evaluation.metrics import (average_precision_at_k, catalog_coverage,
                                      ndcg_at_k, reciprocal_rank, recall_at_k)
