@@ -1,5 +1,9 @@
-from src.bandits.bandits import (EpsilonGreedyBandit, ThompsonSamplingBandit,
-                                  UCB1Bandit, simulate_bandit)
+from src.bandits.bandits import (
+    EpsilonGreedyBandit,
+    ThompsonSamplingBandit,
+    UCB1Bandit,
+    simulate_bandit,
+)
 
 
 def test_ucb1_converges_to_best_arm():

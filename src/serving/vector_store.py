@@ -34,7 +34,7 @@ class VectorStore:
                 )
             self._client = client
             self.backend = "qdrant"
-        except Exception:
+        except Exception:  # noqa: BLE001
             self._client = None
             self.backend = "memory"
 
@@ -48,7 +48,7 @@ class VectorStore:
                 ]
                 self._client.upsert(COLLECTION_NAME, points=points)
                 return
-            except Exception:
+            except Exception:  # noqa: BLE001
                 self.backend = "memory"
         self._local_ids = np.asarray(item_ids)
         self._local_vecs = np.asarray(embeddings)
@@ -58,7 +58,7 @@ class VectorStore:
             try:
                 hits = self._client.search(COLLECTION_NAME, query_vector=query_vec.tolist(), limit=k)
                 return [(int(h.id), float(h.score)) for h in hits]
-            except Exception:
+            except Exception:  # noqa: BLE001
                 self.backend = "memory"
         if self._local_vecs is None:
             return []

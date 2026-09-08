@@ -36,7 +36,7 @@ def _get_producer():
             request_timeout_ms=1000,
         )
         _backend = "kafka"
-    except Exception:
+    except Exception:  # noqa: BLE001
         _producer = None
         _backend = "memory_tried"
     return _producer
@@ -49,7 +49,7 @@ def publish_event(event: dict, topic: str = TOPIC_USER_EVENTS) -> str:
             producer.send(topic, event)
             producer.flush(timeout=1)
             return "kafka"
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
     _local_queue.append((topic, event))
     return "memory"

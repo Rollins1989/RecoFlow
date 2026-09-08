@@ -21,12 +21,12 @@ class RecommendationCache:
         self._local: dict[str, tuple[float, str]] = {}
         self.backend = "memory"
         try:
-            import redis  # noqa: local import so redis-py is optional at runtime
+            import redis  # local import so redis-py is optional at runtime
             client = redis.Redis.from_url(url, socket_connect_timeout=0.5)
             client.ping()
             self._redis = client
             self.backend = "redis"
-        except Exception:
+        except Exception:  # noqa: BLE001
             self._redis = None
             self.backend = "memory"
 
@@ -39,7 +39,7 @@ class RecommendationCache:
             try:
                 raw = self._redis.get(key)
                 return json.loads(raw) if raw else None
-            except Exception:
+            except Exception:  # noqa: BLE001
                 self.backend = "memory"  # fall through to local for this call
         entry = self._local.get(key)
         if entry is None:
@@ -57,7 +57,7 @@ class RecommendationCache:
             try:
                 self._redis.setex(key, self.ttl, payload)
                 return
-            except Exception:
+            except Exception:  # noqa: BLE001
                 self.backend = "memory"
         self._local[key] = (time.time() + self.ttl, payload)
 

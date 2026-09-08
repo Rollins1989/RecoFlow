@@ -14,8 +14,11 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.evaluation.metrics import (catalog_coverage, evaluate_ranked_lists,
-                                     intra_list_diversity)
+from src.evaluation.metrics import (
+    catalog_coverage,
+    evaluate_ranked_lists,
+    intra_list_diversity,
+)
 
 
 def build_relevance_lookup(test_events: pd.DataFrame) -> dict[int, set[int]]:

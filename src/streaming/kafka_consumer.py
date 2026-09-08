@@ -14,7 +14,11 @@ from __future__ import annotations
 import json
 import time
 
-from src.streaming.kafka_producer import KAFKA_BOOTSTRAP, TOPIC_USER_EVENTS, drain_local_queue
+from src.streaming.kafka_producer import (
+    KAFKA_BOOTSTRAP,
+    TOPIC_USER_EVENTS,
+    drain_local_queue,
+)
 from src.streaming.user_profile_updater import apply_event_to_profile
 
 
@@ -31,7 +35,7 @@ def run_consumer_loop(profile_store: dict, poll_interval_s: float = 1.0, max_ite
             consumer_timeout_ms=1000,
         )
         backend = "kafka"
-    except Exception:
+    except Exception:  # noqa: BLE001
         consumer = None
         backend = "memory"
 

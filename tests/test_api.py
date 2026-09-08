@@ -96,6 +96,7 @@ def test_cache_falls_back_to_memory_when_redis_down():
 
 def test_vector_store_falls_back_to_memory_when_qdrant_down():
     import numpy as np
+
     from src.serving.vector_store import VectorStore
     vs = VectorStore(dim=4, url="http://nonexistent-host:6333")
     assert vs.backend == "memory"

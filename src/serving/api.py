@@ -22,16 +22,23 @@ from datetime import datetime, timezone
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import Response
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from pydantic import BaseModel, Field
 
-from src.features.feature_engineering import build_item_features, build_user_category_affinity
+from src.features.feature_engineering import (
+    build_item_features,
+    build_user_category_affinity,
+)
+from src.ranking.rerank_mmr import (
+    apply_business_rules,
+    apply_freshness_boost,
+    mmr_rerank,
+)
 from src.retrieval.collaborative_filtering import ImplicitALS
 from src.retrieval.content_based import ContentBasedRecommender
 from src.retrieval.hybrid import HybridRetriever
 from src.retrieval.popularity import PopularityRecommender
-from src.ranking.rerank_mmr import apply_business_rules, apply_freshness_boost, mmr_rerank
 from src.serving.cache import RecommendationCache
 from src.serving.vector_store import VectorStore
 
@@ -64,13 +71,23 @@ def load_artifacts():
     vector_store = VectorStore(dim=content.embedder.dim)
     vector_store.upsert(content.embedder.item_ids_, content.embedder.embeddings_)
 
-    STATE.update(dict(
-        users=users, products=products, events=events,
-        pop=pop, content=content, cf=cf, hybrid=hybrid,
-        items_feat=items_feat, user_affinity=user_affinity, user_history=user_history,
-        cache=RecommendationCache(), vector_store=vector_store,
-        item_id_to_idx={int(i): idx for idx, i in enumerate(content.embedder.item_ids_)},
-    ))
+    STATE.update({
+        "users": users,
+        "products": products,
+        "events": events,
+        "pop": pop,
+        "content": content,
+        "cf": cf,
+        "hybrid": hybrid,
+        "items_feat": items_feat,
+        "user_affinity": user_affinity,
+        "user_history": user_history,
+        "cache": RecommendationCache(),
+        "vector_store": vector_store,
+        "item_id_to_idx": {
+            int(i): idx for idx, i in enumerate(content.embedder.item_ids_)
+        },
+    })
 
 
 @app.on_event("startup")
@@ -155,8 +172,8 @@ def model_info():
         "model_version": MODEL_VERSION,
         "candidate_sources": ["cf", "content", "trending", "personalized"],
         "ranking_stage": "MMR re-rank over hybrid pool (LightGBM ranker: see src/ranking/train_ranker.py)",
-        "n_products": int(len(STATE["products"])) if "products" in STATE else None,
-        "n_users": int(len(STATE["users"])) if "users" in STATE else None,
+        "n_products": len(STATE["products"]) if "products" in STATE else None,
+        "n_users": len(STATE["users"]) if "users" in STATE else None,
     }
 
 

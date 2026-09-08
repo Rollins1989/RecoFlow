@@ -1,6 +1,11 @@
 
-from src.evaluation.metrics import (average_precision_at_k, catalog_coverage,
-                                     ndcg_at_k, reciprocal_rank, recall_at_k)
+from src.evaluation.metrics import (
+    average_precision_at_k,
+    catalog_coverage,
+    ndcg_at_k,
+    recall_at_k,
+    reciprocal_rank,
+)
 
 
 def test_ndcg_perfect_order_is_one():

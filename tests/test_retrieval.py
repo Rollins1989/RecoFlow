@@ -3,12 +3,12 @@ import os
 import pandas as pd
 import pytest
 
+from src.ranking.rerank_mmr import apply_business_rules, mmr_rerank
 from src.retrieval.cold_start import is_cold_start_user
 from src.retrieval.collaborative_filtering import ImplicitALS
 from src.retrieval.content_based import ContentBasedRecommender
 from src.retrieval.hybrid import HybridRetriever
 from src.retrieval.popularity import PopularityRecommender
-from src.ranking.rerank_mmr import apply_business_rules, mmr_rerank
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 pytestmark = pytest.mark.skipif(
@@ -30,7 +30,7 @@ def test_popularity_recommends_correct_count(dataset):
     pop = PopularityRecommender().fit(events)
     recs = pop.recommend(k=10)
     assert len(recs) <= 10
-    assert len(set(r[0] for r in recs)) == len(recs)  # no duplicates
+    assert len({r[0] for r in recs}) == len(recs)  # no duplicates
 
 
 def test_content_based_similar_items_excludes_self(dataset):
@@ -56,7 +56,7 @@ def test_cold_start_detection():
 
 
 def test_hybrid_pool_has_no_duplicate_items(dataset):
-    users, products, events = dataset
+    _, products, events = dataset
     pop = PopularityRecommender().fit(events)
     cf = ImplicitALS(n_factors=8, n_iter=3).fit(events)
     cb = ContentBasedRecommender().fit(products)
@@ -69,7 +69,7 @@ def test_hybrid_pool_has_no_duplicate_items(dataset):
 
 
 def test_business_rules_exclude_purchased(dataset):
-    _, products, events = dataset
+    _, products, _ = dataset
     df = pd.DataFrame({"item_id": products["item_id"].head(20),
                         "score": range(20), "category": products["category"].head(20)})
     purchased = {int(products.iloc[0]["item_id"]), int(products.iloc[1]["item_id"])}

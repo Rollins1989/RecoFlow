@@ -8,9 +8,9 @@ feedback (purchase > add_to_cart > wishlist > click > impression).
 """
 from __future__ import annotations
 
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
-import lightgbm as lgb
 
 RELEVANCE_LABELS = {
     "purchase": 4, "add_to_cart": 3, "wishlist": 2, "click": 1, "impression": 0,

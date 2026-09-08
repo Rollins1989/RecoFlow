@@ -31,7 +31,7 @@ def log_training_run(model, params: dict, metrics: dict, dataset_version: str,
         mlflow.log_dict(candidate_generation_config, "candidate_generation_config.json")
         try:
             mlflow.lightgbm.log_model(model, artifact_path="model", registered_model_name=model_name)
-        except Exception:
+        except Exception:  # noqa: BLE001
             mlflow.log_text(str(model), "model_repr.txt")
         return run.info.run_id
 
