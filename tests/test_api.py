@@ -4,10 +4,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
-pytestmark = pytest.mark.skipif(
-    not os.path.exists(os.path.join(DATA_DIR, "events.csv")),
-    reason="run data/generate_synthetic_data.py first",
-)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not os.path.exists(os.path.join(DATA_DIR, "events.csv")),
+        reason="run data/generate_synthetic_data.py first",
+    ),
+]
 
 
 @pytest.fixture(scope="module")

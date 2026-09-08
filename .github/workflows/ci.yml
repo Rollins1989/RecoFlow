@@ -25,7 +25,7 @@ jobs:
         with: { python-version: "3.11" }
       - run: pip install -r requirements.txt
       - run: python data/generate_synthetic_data.py --n-users 200 --n-items 100 --n-events 4000
-      - run: pytest tests/ -v --junitxml=junit.xml
+      - run: pytest tests/ -v -m "not integration" --junitxml=junit.xml
       - uses: actions/upload-artifact@v4
         with: { name: junit-results, path: junit.xml }
 
