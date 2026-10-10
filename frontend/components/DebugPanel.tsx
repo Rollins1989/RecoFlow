@@ -7,9 +7,9 @@ export default function DebugPanel({ rec }: { rec: Recommendation }) {
   const [open, setOpen] = useState(false);
   return (
     <div>
-      <div className="debug-toggle" onClick={() => setOpen((o) => !o)}>
-        {open ? "Hide debug ▲" : "Debug ▼"}
-      </div>
+      <button type="button" className="debug-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        {open ? "Hide debug" : "Show debug"}
+      </button>
       {open && (
         <div className="debug-panel">
           <div><b>Candidate source:</b> {rec.candidate_sources.join(", ") || "n/a"}</div>

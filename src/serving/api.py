@@ -18,13 +18,13 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.features.feature_engineering import (
     build_item_features,
@@ -66,7 +66,8 @@ def load_artifacts():
     items_feat = build_item_features(products, events)
     user_affinity = build_user_category_affinity(events, products)
     events["timestamp"] = pd.to_datetime(events["timestamp"])
-    user_history = events.groupby("user_id")["item_id"].apply(list).to_dict()
+    positive_events = events[events["event"].isin(["click", "view", "wishlist", "add_to_cart", "purchase"])]
+    user_history = positive_events.groupby("user_id")["item_id"].apply(list).to_dict()
 
     vector_store = VectorStore(dim=content.embedder.dim)
     vector_store.upsert(content.embedder.item_ids_, content.embedder.embeddings_)
@@ -108,8 +109,15 @@ class EventIn(BaseModel):
 
 class SearchIn(BaseModel):
     user_id: int | None = None
-    query: str
-    limit: int = 20
+    query: str = Field(min_length=1, max_length=200)
+    limit: int = Field(default=20, ge=1, le=100)
+
+    @field_validator("query", mode="before")
+    @classmethod
+    def strip_query_whitespace(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        return value
 
 
 # ------------------------------------------------------------------ utils --
@@ -143,12 +151,19 @@ def _recommend(user_id: int, limit: int) -> list[dict]:
         "trending": "Trending among users with similar interests",
         "personalized": "Popular in your favorite categories",
     }
+    product_lookup = STATE["products"].set_index("item_id")
     results = []
     for _, row in reranked.iterrows():
         sources = row.get("sources", [])
         reason = reason_by_source.get(sources[0] if sources else "trending", "Recommended for you")
+        item_id = int(row["item_id"])
+        product = product_lookup.loc[item_id] if item_id in product_lookup.index else {}
         results.append({
-            "item_id": int(row["item_id"]),
+            "item_id": item_id,
+            "title": str(product.get("title", f"Product {item_id}")),
+            "category": str(product.get("category", "")),
+            "brand": str(product.get("brand", "")),
+            "price": float(product.get("price", 0.0)) if pd.notna(product.get("price", 0.0)) else None,
             "score": round(float(row["score"]), 4),
             "reason": reason,
             "candidate_sources": sources,
@@ -171,14 +186,14 @@ def model_info():
     return {
         "model_version": MODEL_VERSION,
         "candidate_sources": ["cf", "content", "trending", "personalized"],
-        "ranking_stage": "MMR re-rank over hybrid pool (LightGBM ranker: see src/ranking/train_ranker.py)",
+        "ranking_stage": "MMR re-ranking over hybrid candidates; offline LightGBM ranker is experimental and is not used by this API",
         "n_products": len(STATE["products"]) if "products" in STATE else None,
         "n_users": len(STATE["users"]) if "users" in STATE else None,
     }
 
 
 @app.get("/recommendations/{user_id}")
-def recommendations(user_id: int, limit: int = 10):
+def recommendations(user_id: int, limit: int = Query(default=10, ge=1, le=100)):
     _ensure_loaded()
     REQUEST_COUNT.labels(endpoint="recommendations").inc()
     start = time.time()
@@ -189,18 +204,18 @@ def recommendations(user_id: int, limit: int = 10):
         LATENCY.labels(endpoint="recommendations").observe(time.time() - start)
         return {"user_id": user_id, "recommendations": cached,
                 "model_version": MODEL_VERSION, "cache_hit": True,
-                "generated_at": datetime.now(timezone.utc).isoformat()}
+                "generated_at": datetime.now(UTC).isoformat()}
 
     recs = _recommend(user_id, limit)
     cache.set(user_id, limit, recs)
     LATENCY.labels(endpoint="recommendations").observe(time.time() - start)
     return {"user_id": user_id, "recommendations": recs,
             "model_version": MODEL_VERSION, "cache_hit": False,
-            "generated_at": datetime.now(timezone.utc).isoformat()}
+            "generated_at": datetime.now(UTC).isoformat()}
 
 
 @app.get("/similar/{item_id}")
-def similar(item_id: int, limit: int = 10):
+def similar(item_id: int, limit: int = Query(default=10, ge=1, le=100)):
     _ensure_loaded()
     REQUEST_COUNT.labels(endpoint="similar").inc()
     if item_id not in STATE["item_id_to_idx"]:
@@ -217,11 +232,19 @@ def post_event(event: EventIn):
     # Real-time path: publish to Kafka for stream processing (src/streaming);
     # here we also apply it in-process so the demo API reflects it immediately.
     from src.streaming.kafka_producer import publish_event
-    publish_event(event.model_dump())
 
-    STATE["user_history"].setdefault(event.user_id, []).append(event.item_id)
-    STATE["cache"].set(event.user_id, 10, None)  # invalidate cached top-10
-    return {"status": "accepted", "event": event.model_dump()}
+    payload = event.model_dump()
+    delivery_backend = publish_event(payload)
+    if event.event in {"click", "view", "wishlist", "add_to_cart", "purchase"}:
+        STATE["user_history"].setdefault(event.user_id, []).append(event.item_id)
+        STATE["cache"].invalidate(event.user_id)
+
+    return {
+        "status": "accepted",
+        "event": payload,
+        "delivery_backend": delivery_backend,
+        "durability": "broker_best_effort" if delivery_backend == "kafka" else "in_process_demo_queue",
+    }
 
 
 @app.post("/search")
@@ -234,8 +257,19 @@ def search(payload: SearchIn):
         "category": "", "brand": "",
     }]))[0]
     hits = STATE["vector_store"].search(query_vec, k=payload.limit)
-    return {"query": payload.query,
-            "results": [{"item_id": i, "score": round(s, 4)} for i, s in hits]}
+    product_lookup = STATE["products"].set_index("item_id")
+    results = []
+    for item_id, score in hits:
+        product = product_lookup.loc[item_id] if item_id in product_lookup.index else {}
+        results.append({
+            "item_id": int(item_id),
+            "title": str(product.get("title", f"Product {item_id}")),
+            "category": str(product.get("category", "")),
+            "brand": str(product.get("brand", "")),
+            "price": float(product.get("price", 0.0)) if pd.notna(product.get("price", 0.0)) else None,
+            "score": round(float(score), 4),
+        })
+    return {"query": payload.query, "results": results}
 
 
 @app.get("/user/{user_id}/profile")

@@ -1,4 +1,4 @@
-name: CI/CD
+name: CI
 
 on:
   push:
@@ -73,9 +73,17 @@ jobs:
           scan-ref: .
           severity: HIGH,CRITICAL
 
-  deploy:
-    needs: security-scan
-    if: github.ref == 'refs/heads/main'
+
+  frontend-build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
     steps:
-      - run: echo "Deploy step — wire up to ECR/GKE/Azure Container Apps target here."
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install
+      - run: npx tsc --noEmit
+      - run: npm run build

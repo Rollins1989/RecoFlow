@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "RecoFlow",
-  description: "Real-time personalized recommendation & ranking platform",
+  description: "A recommendation-systems demo with hybrid retrieval and offline ranking experiments",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

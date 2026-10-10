@@ -22,8 +22,8 @@ from src.evaluation.offline_eval import build_relevance_lookup, evaluate_recomme
 from src.evaluation.temporal_split import temporal_split
 from src.features.feature_engineering import build_item_features, build_user_category_affinity
 from src.ranking.rerank_mmr import mmr_rerank
-from src.ranking.train_ranker import (build_training_frame, score_candidates,
-                                       train_lightgbm_ranker)
+from src.ranking.train_ranker import (build_candidate_frame, build_training_frame,
+                                       score_candidates, train_lightgbm_ranker)
 from src.retrieval.collaborative_filtering import ImplicitALS
 from src.retrieval.content_based import ContentBasedRecommender
 from src.retrieval.hybrid import HybridRetriever
@@ -87,8 +87,15 @@ def main():
     # ---- Version 2: LightGBM ranker + MMR re-ranking ----
     items_feat = build_item_features(products, train, as_of=split["train_cutoff"])
     user_affinity = build_user_category_affinity(train, products, as_of=split["train_cutoff"])
-    train_frame = build_training_frame(train, items_feat, user_affinity, users)
-    valid_frame = build_training_frame(valid, items_feat, user_affinity, users)
+    train_frame = build_training_frame(
+        train, items_feat, user_affinity, users, history_events=train
+    )
+    # Validation labels are held out, but validation features may use earlier
+    # training and validation events strictly before each validation timestamp.
+    valid_history = pd.concat([train, valid], ignore_index=True)
+    valid_frame = build_training_frame(
+        valid, items_feat, user_affinity, users, history_events=valid_history
+    )
 
     if train_frame["user_id"].nunique() > 1 and len(train_frame) > 50:
         model = train_lightgbm_ranker(train_frame, valid_frame)
@@ -98,21 +105,11 @@ def main():
             pool = hybrid.get_candidates(u, hist, n_total=200)
             if pool.empty:
                 return [i for i, _ in pop.recommend(k=10)]
-            feat = pool.merge(items_feat, on="item_id", how="left")
-            feat = feat.merge(
+            feat = build_candidate_frame(
+                pool,
+                items_feat,
                 user_affinity[user_affinity["user_id"] == u][["category", "affinity"]],
-                on="category", how="left")
-            feat["category_affinity"] = feat["affinity"].fillna(0.0)
-            feat["cf_score"] = feat["score"]
-            feat["content_score"] = feat["score"]
-            feat["popularity_score"] = feat.get("total_weight", 0.0)
-            feat["price_diff_from_pref"] = 0.0
-            feat["brand_affinity"] = 0.0
-            feat["hours_since_last_interaction"] = 0.0
-            feat["user_n_purchases"] = 0.0
-            feat["user_n_views"] = 0.0
-            feat["is_weekend"] = 0
-            feat["hour_of_day"] = 12
+            )
             feat["score"] = score_candidates(model, feat)
 
             if rerank:
