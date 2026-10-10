@@ -179,7 +179,7 @@ def model_info():
     return {
         "model_version": MODEL_VERSION,
         "candidate_sources": ["cf", "content", "trending", "personalized"],
-        "ranking_stage": "MMR re-rank over hybrid pool (LightGBM ranker: see src/ranking/train_ranker.py)",
+        "ranking_stage": "MMR re-ranking over hybrid candidates; offline LightGBM ranker is experimental and is not used by this API",
         "n_products": len(STATE["products"]) if "products" in STATE else None,
         "n_users": len(STATE["users"]) if "users" in STATE else None,
     }
