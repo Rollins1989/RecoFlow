@@ -24,7 +24,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.features.feature_engineering import (
     build_item_features,
@@ -109,8 +109,15 @@ class EventIn(BaseModel):
 
 class SearchIn(BaseModel):
     user_id: int | None = None
-    query: str = Field(min_length=1, max_length=200, strip_whitespace=True)
+    query: str = Field(min_length=1, max_length=200)
     limit: int = Field(default=20, ge=1, le=100)
+
+    @field_validator("query", mode="before")
+    @classmethod
+    def strip_query_whitespace(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        return value
 
 
 # ------------------------------------------------------------------ utils --
