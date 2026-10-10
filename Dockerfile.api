@@ -1,11 +1,28 @@
 FROM python:3.11-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
 WORKDIR /app
 
-COPY requirements.txt .
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# The repository intentionally excludes generated CSVs. Generate a small,
+# deterministic demo catalogue inside the image so the service is ready on boot.
+RUN python data/generate_synthetic_data.py \
+      --n-users 200 --n-items 100 --n-events 4000 --out-dir data \
+    && useradd --create-home --uid 10001 recoflow \
+    && chown -R recoflow:recoflow /app
+
+USER 10001:10001
+
 EXPOSE 8000
-CMD ["uvicorn", "src.serving.api:app", "--host", "0.0.0.0", "--port", "8000"]
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+  CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.getenv('PORT','8000') + '/health/ready', timeout=3)" || exit 1
+
+CMD ["sh", "-c", "uvicorn src.serving.api:app --host 0.0.0.0 --port ${PORT:-8000}"]
