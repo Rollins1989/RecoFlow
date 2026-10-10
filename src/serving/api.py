@@ -204,7 +204,7 @@ def recommendations(user_id: int, limit: int = Query(default=10, ge=1, le=100)):
     LATENCY.labels(endpoint="recommendations").observe(time.time() - start)
     return {"user_id": user_id, "recommendations": recs,
             "model_version": MODEL_VERSION, "cache_hit": False,
-            "generated_at": datetime.now(timezone.utc).isoformat()}
+            "generated_at": datetime.now(UTC).isoformat()}
 
 
 @app.get("/similar/{item_id}")
