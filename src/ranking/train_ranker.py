@@ -34,6 +34,7 @@ def build_training_frame(events: pd.DataFrame, items: pd.DataFrame,
     aggregate would leak future interactions into earlier training examples.
     """
     from collections import defaultdict
+
     from src.features.feature_engineering import EVENT_WEIGHTS
 
     raw = events.copy()
