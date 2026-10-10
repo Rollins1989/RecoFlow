@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from src.evaluation.temporal_split import temporal_split, leave_one_out_split
+from src.evaluation.temporal_split import leave_one_out_split, temporal_split
 
 
 def sample_events(n=20):
