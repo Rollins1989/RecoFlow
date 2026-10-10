@@ -34,6 +34,9 @@ def _get_producer():
             bootstrap_servers=KAFKA_BOOTSTRAP,
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
             request_timeout_ms=1000,
+            api_version_auto_timeout_ms=1000,
+            max_block_ms=1000,
+            retries=0,
         )
         _backend = "kafka"
     except Exception:  # noqa: BLE001
