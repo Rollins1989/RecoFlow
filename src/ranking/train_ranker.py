@@ -25,7 +25,8 @@ FEATURE_COLUMNS = [
 
 
 def build_training_frame(events: pd.DataFrame, items: pd.DataFrame,
-                          user_affinity: pd.DataFrame, users: pd.DataFrame) -> pd.DataFrame:
+                          user_affinity: pd.DataFrame, users: pd.DataFrame,
+                          history_events: pd.DataFrame | None = None) -> pd.DataFrame:
     """Build point-in-time training rows using only events before each session.
 
     Items must include catalogue metadata. The precomputed affinity argument is
@@ -38,6 +39,8 @@ def build_training_frame(events: pd.DataFrame, items: pd.DataFrame,
     raw = events.copy()
     raw["timestamp"] = pd.to_datetime(raw["timestamp"])
     raw["label"] = raw["event"].map(RELEVANCE_LABELS).fillna(0).astype(int)
+    history = (history_events.copy() if history_events is not None else events.copy())
+    history["timestamp"] = pd.to_datetime(history["timestamp"])
     grouped = (
         raw.groupby(["user_id", "item_id", "session_id"], dropna=False)
         .agg(label=("label", "max"), timestamp=("timestamp", "min"),
@@ -51,7 +54,7 @@ def build_training_frame(events: pd.DataFrame, items: pd.DataFrame,
                     ("item_id", "category", "brand", "price", "created_ts")
                     if c in items.columns]
     products = items[product_cols].drop_duplicates("item_id").set_index("item_id")
-    history = raw.sort_values("timestamp", kind="stable").reset_index(drop=True)
+    history = history.sort_values("timestamp", kind="stable").reset_index(drop=True)
     cursor = 0
     item_stats = defaultdict(lambda: {"impressions": 0, "clicks": 0,
                                       "purchases": 0, "total_weight": 0.0})
