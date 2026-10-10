@@ -109,7 +109,7 @@ class EventIn(BaseModel):
 
 class SearchIn(BaseModel):
     user_id: int | None = None
-    query: str = Field(min_length=1, max_length=200)
+    query: str = Field(min_length=1, max_length=200, strip_whitespace=True)
     limit: int = Field(default=20, ge=1, le=100)
 
 
