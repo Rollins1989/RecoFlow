@@ -34,5 +34,8 @@ def test_training_features_exclude_events_at_or_after_target_timestamp():
     assert second["item_ctr"] == 0.0
 
     third = frame.loc[pd.Timestamp("2026-01-01T10:02:00")]
-    assert third["popularity_score"] > 0.0
+    # Item 20 has no strictly earlier interaction: its purchase at the target
+    # timestamp must not leak into its own popularity feature.
+    assert third["popularity_score"] == 0.0
+    # Earlier interactions with item 10 still inform category affinity.
     assert third["category_affinity"] > 0.0
