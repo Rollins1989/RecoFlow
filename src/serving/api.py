@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel, Field, field_validator
@@ -48,7 +49,20 @@ MODEL_VERSION = "hybrid-mmr-0.1.0"
 REQUEST_COUNT = Counter("recoflow_requests_total", "Total requests", ["endpoint"])
 LATENCY = Histogram("recoflow_request_latency_seconds", "Latency", ["endpoint"])
 
+CORS_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
+
 app = FastAPI(title="RecoFlow API", version=MODEL_VERSION)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
 
 STATE: dict = {}
 
@@ -172,6 +186,24 @@ def _recommend(user_id: int, limit: int) -> list[dict]:
 
 
 # -------------------------------------------------------------- endpoints --
+@app.get("/health/live")
+def liveness():
+    """Process liveness probe; does not imply models are ready."""
+    return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def readiness():
+    """Readiness probe for hosts/load balancers."""
+    if "hybrid" not in STATE:
+        raise HTTPException(503, "Recommendation artifacts are not loaded")
+    return {
+        "status": "ready",
+        "model_version": MODEL_VERSION,
+        "n_products": len(STATE["products"]),
+    }
+
+
 @app.get("/health")
 def health():
     return {
