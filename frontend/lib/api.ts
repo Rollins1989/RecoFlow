@@ -2,6 +2,10 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export type Recommendation = {
   item_id: number;
+  title?: string;
+  category?: string;
+  brand?: string;
+  price?: number | null;
   score: number;
   reason: string;
   candidate_sources: string[];
