@@ -33,3 +33,25 @@ def test_similar_rejects_invalid_limit(client, limit):
 def test_search_rejects_empty_query(client):
     response = client.post("/search", json={"query": "   "})
     assert response.status_code == 422
+
+
+
+def test_recommendations_include_catalogue_metadata(client):
+    response = client.get("/recommendations/1?limit=5")
+    assert response.status_code == 200
+    payload = response.json()
+    for recommendation in payload["recommendations"]:
+        assert recommendation["title"]
+        assert "category" in recommendation
+        assert "brand" in recommendation
+        assert "price" in recommendation
+
+
+def test_search_results_include_catalogue_metadata(client):
+    response = client.post("/search", json={"query": "book", "limit": 5})
+    assert response.status_code == 200
+    for result in response.json()["results"]:
+        assert result["title"]
+        assert "category" in result
+        assert "brand" in result
+        assert "price" in result
