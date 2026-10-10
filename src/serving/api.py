@@ -144,12 +144,19 @@ def _recommend(user_id: int, limit: int) -> list[dict]:
         "trending": "Trending among users with similar interests",
         "personalized": "Popular in your favorite categories",
     }
+    product_lookup = STATE["products"].set_index("item_id")
     results = []
     for _, row in reranked.iterrows():
         sources = row.get("sources", [])
         reason = reason_by_source.get(sources[0] if sources else "trending", "Recommended for you")
+        item_id = int(row["item_id"])
+        product = product_lookup.loc[item_id] if item_id in product_lookup.index else {}
         results.append({
-            "item_id": int(row["item_id"]),
+            "item_id": item_id,
+            "title": str(product.get("title", f"Product {item_id}")),
+            "category": str(product.get("category", "")),
+            "brand": str(product.get("brand", "")),
+            "price": float(product.get("price", 0.0)) if pd.notna(product.get("price", 0.0)) else None,
             "score": round(float(row["score"]), 4),
             "reason": reason,
             "candidate_sources": sources,
@@ -243,8 +250,19 @@ def search(payload: SearchIn):
         "category": "", "brand": "",
     }]))[0]
     hits = STATE["vector_store"].search(query_vec, k=payload.limit)
-    return {"query": payload.query,
-            "results": [{"item_id": i, "score": round(s, 4)} for i, s in hits]}
+    product_lookup = STATE["products"].set_index("item_id")
+    results = []
+    for item_id, score in hits:
+        product = product_lookup.loc[item_id] if item_id in product_lookup.index else {}
+        results.append({
+            "item_id": int(item_id),
+            "title": str(product.get("title", f"Product {item_id}")),
+            "category": str(product.get("category", "")),
+            "brand": str(product.get("brand", "")),
+            "price": float(product.get("price", 0.0)) if pd.notna(product.get("price", 0.0)) else None,
+            "score": round(float(score), 4),
+        })
+    return {"query": payload.query, "results": results}
 
 
 @app.get("/user/{user_id}/profile")
