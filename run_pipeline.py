@@ -87,8 +87,15 @@ def main():
     # ---- Version 2: LightGBM ranker + MMR re-ranking ----
     items_feat = build_item_features(products, train, as_of=split["train_cutoff"])
     user_affinity = build_user_category_affinity(train, products, as_of=split["train_cutoff"])
-    train_frame = build_training_frame(train, items_feat, user_affinity, users)
-    valid_frame = build_training_frame(valid, items_feat, user_affinity, users)
+    train_frame = build_training_frame(
+        train, items_feat, user_affinity, users, history_events=train
+    )
+    # Validation labels are held out, but validation features may use earlier
+    # training and validation events strictly before each validation timestamp.
+    valid_history = pd.concat([train, valid], ignore_index=True)
+    valid_frame = build_training_frame(
+        valid, items_feat, user_affinity, users, history_events=valid_history
+    )
 
     if train_frame["user_id"].nunique() > 1 and len(train_frame) > 50:
         model = train_lightgbm_ranker(train_frame, valid_frame)
