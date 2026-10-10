@@ -29,6 +29,10 @@ export default function HomePage() {
       setSearchResults(
         res.results.map((r: any) => ({
           item_id: r.item_id,
+          title: r.title,
+          category: r.category,
+          brand: r.brand,
+          price: r.price,
           score: r.score,
           reason: `Matched search: "${query}"`,
           candidate_sources: ["search"],
@@ -50,9 +54,9 @@ export default function HomePage() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && runSearch()}
         />
-        <div className="debug-toggle" onClick={() => setShowDebug((s) => !s)}>
+        <button type="button" className="debug-toggle" aria-pressed={showDebug} onClick={() => setShowDebug((s) => !s)}>
           {showDebug ? "Debug mode: ON" : "Debug mode: OFF"}
-        </div>
+        </button>
       </div>
 
       {error && <div className="row" style={{ color: "#ff6b6b" }}>{error}</div>}
