@@ -27,8 +27,11 @@ def average_precision_at_k(relevances: list[float], k: int) -> float:
         if rel > 0:
             hits += 1
             sum_prec += hits / i
+    # AP@k is normalized by min(total relevant items, k), not by all
+    # relevant items in the full catalogue (which are not all retrievable at k).
     n_relevant = sum(1 for r in relevances if r > 0)
-    return sum_prec / n_relevant if n_relevant > 0 else 0.0
+    denominator = min(n_relevant, k)
+    return sum_prec / denominator if denominator > 0 else 0.0
 
 
 def reciprocal_rank(relevances: list[float]) -> float:
