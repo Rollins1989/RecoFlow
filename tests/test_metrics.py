@@ -41,3 +41,10 @@ def test_recall_at_k():
 def test_catalog_coverage():
     assert catalog_coverage({1, 2, 3}, 10) == 0.3
     assert catalog_coverage(set(), 10) == 0.0
+
+
+
+def test_average_precision_uses_total_held_out_relevant_count():
+    # One relevant result at rank 10, with ten relevant items in the test set.
+    rels = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+    assert average_precision_at_k(rels, k=10, n_relevant_total=10) == 0.01
