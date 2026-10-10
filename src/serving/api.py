@@ -21,7 +21,7 @@ import time
 from datetime import datetime, timezone
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel, Field
@@ -66,7 +66,8 @@ def load_artifacts():
     items_feat = build_item_features(products, events)
     user_affinity = build_user_category_affinity(events, products)
     events["timestamp"] = pd.to_datetime(events["timestamp"])
-    user_history = events.groupby("user_id")["item_id"].apply(list).to_dict()
+    positive_events = events[events["event"].isin(["click", "view", "wishlist", "add_to_cart", "purchase"])]
+    user_history = positive_events.groupby("user_id")["item_id"].apply(list).to_dict()
 
     vector_store = VectorStore(dim=content.embedder.dim)
     vector_store.upsert(content.embedder.item_ids_, content.embedder.embeddings_)
@@ -108,8 +109,8 @@ class EventIn(BaseModel):
 
 class SearchIn(BaseModel):
     user_id: int | None = None
-    query: str
-    limit: int = 20
+    query: str = Field(min_length=1, max_length=200)
+    limit: int = Field(default=20, ge=1, le=100)
 
 
 # ------------------------------------------------------------------ utils --
@@ -178,7 +179,7 @@ def model_info():
 
 
 @app.get("/recommendations/{user_id}")
-def recommendations(user_id: int, limit: int = 10):
+def recommendations(user_id: int, limit: int = Query(default=10, ge=1, le=100)):
     _ensure_loaded()
     REQUEST_COUNT.labels(endpoint="recommendations").inc()
     start = time.time()
@@ -200,7 +201,7 @@ def recommendations(user_id: int, limit: int = 10):
 
 
 @app.get("/similar/{item_id}")
-def similar(item_id: int, limit: int = 10):
+def similar(item_id: int, limit: int = Query(default=10, ge=1, le=100)):
     _ensure_loaded()
     REQUEST_COUNT.labels(endpoint="similar").inc()
     if item_id not in STATE["item_id_to_idx"]:
@@ -217,11 +218,19 @@ def post_event(event: EventIn):
     # Real-time path: publish to Kafka for stream processing (src/streaming);
     # here we also apply it in-process so the demo API reflects it immediately.
     from src.streaming.kafka_producer import publish_event
-    publish_event(event.model_dump())
 
-    STATE["user_history"].setdefault(event.user_id, []).append(event.item_id)
-    STATE["cache"].set(event.user_id, 10, None)  # invalidate cached top-10
-    return {"status": "accepted", "event": event.model_dump()}
+    payload = event.model_dump()
+    delivery_backend = publish_event(payload)
+    if event.event in {"click", "view", "wishlist", "add_to_cart", "purchase"}:
+        STATE["user_history"].setdefault(event.user_id, []).append(event.item_id)
+        STATE["cache"].invalidate(event.user_id)
+
+    return {
+        "status": "accepted",
+        "event": payload,
+        "delivery_backend": delivery_backend,
+        "durability": "broker_best_effort" if delivery_backend == "kafka" else "in_process_demo_queue",
+    }
 
 
 @app.post("/search")
