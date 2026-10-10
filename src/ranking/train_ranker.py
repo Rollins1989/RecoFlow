@@ -45,7 +45,9 @@ def build_training_frame(events: pd.DataFrame, items: pd.DataFrame,
     df["category_affinity"] = df["affinity"].fillna(0.0)
 
     df = df.merge(users[["user_id", "price_sensitivity"]], on="user_id", how="left")
-    df["price_diff_from_pref"] = (df["price"] - df["price"].median()) * df["price_sensitivity"].fillna(0.5)
+    # Keep unimplemented online/context features neutral in training and inference.
+    # Do not create a feature offline that serving cannot calculate reliably.
+    df["price_diff_from_pref"] = 0.0
 
     df["item_ctr"] = df.get("ctr", 0.0)
     df["item_purchase_rate"] = df.get("purchase_rate", 0.0)
@@ -53,8 +55,8 @@ def build_training_frame(events: pd.DataFrame, items: pd.DataFrame,
     df["hours_since_last_interaction"] = 0.0
     df["user_n_purchases"] = 0.0
     df["user_n_views"] = 0.0
-    df["is_weekend"] = df["timestamp"].dt.dayofweek >= 5
-    df["hour_of_day"] = df["timestamp"].dt.hour
+    df["is_weekend"] = 0
+    df["hour_of_day"] = 0
     df["cf_score"] = 0.0
     df["content_score"] = 0.0
     df["popularity_score"] = df.get("total_weight", 0.0)
@@ -66,6 +68,46 @@ def build_training_frame(events: pd.DataFrame, items: pd.DataFrame,
         df[col] = df[col].fillna(0.0)
 
     return df.sort_values(["user_id", "timestamp"]).reset_index(drop=True)
+
+
+
+def build_candidate_frame(pool: pd.DataFrame, items: pd.DataFrame,
+                          user_affinity: pd.DataFrame) -> pd.DataFrame:
+    """Build inference features using the same feature names and fallback policy as training.
+
+    Retrieval currently exposes a blended score rather than calibrated per-source
+    scores, so cf/content scores are deliberately zero instead of copying the
+    blended score into both columns. Placeholder features stay zero in both paths
+    until they are backed by real historical/online data.
+    """
+    if pool.empty:
+        return pool.copy()
+    features = pool.merge(items, on="item_id", how="left", suffixes=("", "_item"))
+    if "category" in features.columns and not user_affinity.empty:
+        affinity = user_affinity[["category", "affinity"]].drop_duplicates("category")
+        features = features.merge(affinity, on="category", how="left")
+    else:
+        features["affinity"] = 0.0
+
+    features["category_affinity"] = features["affinity"].fillna(0.0)
+    features["cf_score"] = 0.0
+    features["content_score"] = 0.0
+    features["popularity_score"] = features.get(
+        "total_weight", pd.Series(0.0, index=features.index)
+    )
+    features["item_ctr"] = features.get("ctr", pd.Series(0.0, index=features.index))
+    features["item_purchase_rate"] = features.get(
+        "purchase_rate", pd.Series(0.0, index=features.index)
+    )
+    for column in ("price_diff_from_pref", "brand_affinity",
+                   "hours_since_last_interaction", "user_n_purchases",
+                   "user_n_views", "is_weekend", "hour_of_day"):
+        features[column] = 0.0
+    for column in FEATURE_COLUMNS:
+        if column not in features:
+            features[column] = 0.0
+        features[column] = pd.to_numeric(features[column], errors="coerce").fillna(0.0)
+    return features
 
 
 def train_lightgbm_ranker(train_df: pd.DataFrame, valid_df: pd.DataFrame | None = None,
