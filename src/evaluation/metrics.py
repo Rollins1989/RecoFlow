@@ -20,16 +20,18 @@ def ndcg_at_k(relevances: list[float], k: int) -> float:
     return dcg_at_k(relevances, k) / idcg
 
 
-def average_precision_at_k(relevances: list[float], k: int) -> float:
+def average_precision_at_k(relevances: list[float], k: int,
+                          n_relevant_total: int | None = None) -> float:
     """Binary relevance (relevance > 0) average precision."""
     hits, sum_prec = 0, 0.0
     for i, rel in enumerate(relevances[:k], start=1):
         if rel > 0:
             hits += 1
             sum_prec += hits / i
-    # AP@k is normalized by min(total relevant items, k), not by all
-    # relevant items in the full catalogue (which are not all retrievable at k).
-    n_relevant = sum(1 for r in relevances if r > 0)
+    # Use held-out catalogue relevance when available. Counting only hits in the
+    # recommendation list would inflate AP for systems that retrieve few items.
+    n_relevant = (n_relevant_total if n_relevant_total is not None
+                  else sum(1 for r in relevances if r > 0))
     denominator = min(n_relevant, k)
     return sum_prec / denominator if denominator > 0 else 0.0
 
@@ -75,7 +77,8 @@ def evaluate_ranked_lists(per_user_relevances: dict[int, list[float]],
     ndcgs, maps, mrrs, recalls = [], [], [], []
     for user_id, rels in per_user_relevances.items():
         ndcgs.append(ndcg_at_k(rels, k))
-        maps.append(average_precision_at_k(rels, k))
+        n_relevant = (per_user_n_relevant or {}).get(user_id)
+        maps.append(average_precision_at_k(rels, k, n_relevant_total=n_relevant))
         mrrs.append(reciprocal_rank(rels))
         if per_user_n_relevant:
             recalls.append(recall_at_k(rels, per_user_n_relevant.get(user_id, 0), k))
