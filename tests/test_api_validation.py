@@ -32,7 +32,4 @@ def test_similar_rejects_invalid_limit(client, limit):
 
 def test_search_rejects_empty_query(client):
     response = client.post("/search", json={"query": "   "})
-    # Whitespace-only queries are not useful and must not be treated as search.
-    # Pydantic length validation alone does not strip whitespace, so the API
-    # currently accepts this until query normalization is applied.
-    assert response.status_code in (200, 422)
+    assert response.status_code == 422
