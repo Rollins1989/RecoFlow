@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
@@ -197,7 +197,7 @@ def recommendations(user_id: int, limit: int = Query(default=10, ge=1, le=100)):
         LATENCY.labels(endpoint="recommendations").observe(time.time() - start)
         return {"user_id": user_id, "recommendations": cached,
                 "model_version": MODEL_VERSION, "cache_hit": True,
-                "generated_at": datetime.now(timezone.utc).isoformat()}
+                "generated_at": datetime.now(UTC).isoformat()}
 
     recs = _recommend(user_id, limit)
     cache.set(user_id, limit, recs)
